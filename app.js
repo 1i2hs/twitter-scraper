@@ -1,4 +1,3 @@
-const os = require("os");
 const express = require("express");
 const compression = require("compression");
 const cors = require("cors");
@@ -86,7 +85,6 @@ app.post("/twitter-reports", (req, res) => {
   logger.info(`GET /twitter-reports`);
   const accountList = req.body ? req.body.accountList : new Array();
 
-  // start scraper
   const newScraper = scraper({ inputType: "Array<String>" });
   const taskId = uuidv4();
 
@@ -112,7 +110,6 @@ app.post("/twitter-reports", (req, res) => {
       }
     });
 
-  // set Location header => /status/{taskId}
   res.location(`/tasks/${taskId}`);
   res.status(202).send({
     taskId,
