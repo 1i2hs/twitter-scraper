@@ -146,4 +146,7 @@ Network Trash Folder
 Temporary Items
 .apdisk
 
+
+app_bundle.js
+
 # End of https://www.gitignore.io/api/node,text,visualstudiocode
