@@ -111,7 +111,8 @@ app.post("/twitter-reports", (req, res) => {
     .catch(err => {
       logger.error(err);
       if (taskMap.has(taskId)) {
-        taskMap.delete(taskId);
+        const task = taskMap.get(taskId);
+        task.failed = true;
       }
     });
 
@@ -149,6 +150,13 @@ app.get("/tasks/:id", (req, res) => {
       });
       return;
     }
+  }
+
+  if (task.isFailed()) {
+    res.status(404).send({
+      message: `Failed to process a task with id: ${taskId}, perhaps there is a problem with input texts.`
+    });
+    return;
   }
 
   const curScraper = task.scraper;
