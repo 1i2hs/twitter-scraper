@@ -8,6 +8,7 @@ const uuidv4 = require("uuid/v4");
 const scraper = require("./lib/scraper");
 const Task = require("./lib/Task");
 const Cron = require("./lib/Cron");
+const errorCode = require("./lib/errorCode");
 
 const app = express();
 
@@ -86,7 +87,10 @@ app.post("/twitter-reports", (req, res) => {
   const accountList = req.body ? req.body.accountList : null;
 
   if (!accountList) {
-    res.status(400).send({ message: "No account provided" });
+    res.status(400).send({
+      message: "No account provided",
+      code: errorCode.NO_ACCOUNT_PROVIDED
+    });
     return;
   }
 
@@ -128,9 +132,10 @@ app.get("/tasks/:id", (req, res) => {
   const taskId = req.params.id;
   logger.info(`GET /tasks/${taskId}`);
   if (!taskMap.has(taskId)) {
-    res
-      .status(404)
-      .send({ message: `A task with id: ${taskId}, is not found.` });
+    res.status(404).send({
+      message: `A task with id: ${taskId}, is not found.`,
+      code: errorCode.TASK_NOT_FOUND
+    });
     return;
   }
 
@@ -146,7 +151,8 @@ app.get("/tasks/:id", (req, res) => {
       );
       taskMap.delete(taskId);
       res.status(404).send({
-        message: `A data with id: ${taskId}, is not availble. Perhaps it failed to store result data in the dataMap`
+        message: `A data with id: ${taskId}, is not availble. Perhaps it failed to store result data in the dataMap`,
+        code: errorCode.PROCESSED_DATA_LOST
       });
       return;
     }
@@ -154,7 +160,8 @@ app.get("/tasks/:id", (req, res) => {
 
   if (task.isFailed()) {
     res.status(404).send({
-      message: `Failed to process a task with id: ${taskId}, perhaps there is a problem with input texts.`
+      message: `Failed to process a task with id: ${taskId}, perhaps there is a problem with input texts.`,
+      code: errorCode.WRONG_FORMAT_ACCOUNT_LIST_AS_INPUT
     });
     return;
   }
@@ -174,7 +181,9 @@ app.delete("/tasks/:id", (req, res) => {
   const taskId = req.params.id;
   logger.info(`DELETE /tasks/${taskId}`);
   if (!taskMap.has(taskId)) {
-    res.status(404).send({ message: "Not Found" });
+    res
+      .status(404)
+      .send({ message: "Not Found", code: errorCode.TASK_NOT_FOUND });
     return;
   }
 
@@ -191,7 +200,9 @@ app.get("/results/:id", (req, res) => {
   const dataId = req.params.id;
   logger.info(`GET /tasks/${dataId}`);
   if (!dataMap.has(dataId)) {
-    res.status(404).send({ message: "Not Found" });
+    res
+      .status(404)
+      .send({ message: "Not Found", code: errorCode.PROCESSED_DATA_NOT_FOUND });
     return;
   }
   const data = dataMap.get(dataId);
