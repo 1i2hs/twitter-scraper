@@ -15,7 +15,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(methodOverride());
 app.use(compression());
-app.use(cors());
+app.use(cors({ exposedHeaders: ["Location"] }));
 
 const logger = require("./lib/logger");
 
@@ -82,8 +82,13 @@ remover.start(() => {
 }, CLEAR_CACHE_INTERVAL);
 
 app.post("/twitter-reports", (req, res) => {
-  logger.info(`GET /twitter-reports`);
-  const accountList = req.body ? req.body.accountList : new Array();
+  logger.info(`POST /twitter-reports`);
+  const accountList = req.body ? req.body.accountList : null;
+
+  if (!accountList) {
+    res.status(400).send({ message: "No account provided" });
+    return;
+  }
 
   const newScraper = scraper({ inputType: "Array<String>" });
   const taskId = uuidv4();
@@ -106,7 +111,8 @@ app.post("/twitter-reports", (req, res) => {
     .catch(err => {
       logger.error(err);
       if (taskMap.has(taskId)) {
-        taskMap.delete(taskId);
+        const task = taskMap.get(taskId);
+        task.failed = true;
       }
     });
 
@@ -122,7 +128,9 @@ app.get("/tasks/:id", (req, res) => {
   const taskId = req.params.id;
   logger.info(`GET /tasks/${taskId}`);
   if (!taskMap.has(taskId)) {
-    res.status(404).send(`A task with id: ${taskId}, is not found.`);
+    res
+      .status(404)
+      .send({ message: `A task with id: ${taskId}, is not found.` });
     return;
   }
 
@@ -130,20 +138,25 @@ app.get("/tasks/:id", (req, res) => {
   if (task.isComplete()) {
     if (dataMap.has(taskId)) {
       res.location(`/results/${taskId}`);
-      res.status(201).send("Scraping done and result created.");
+      res.status(201).send({ message: "Scraping done and result created." });
       return;
     } else {
       logger.error(
         `A data with id: ${taskId}, is not availble. Perhaps it failed to store result data in the dataMap`
       );
       taskMap.delete(taskId);
-      res
-        .status(404)
-        .send(
-          `A data with id: ${taskId}, is not availble. Perhaps it failed to store result data in the dataMap`
-        );
+      res.status(404).send({
+        message: `A data with id: ${taskId}, is not availble. Perhaps it failed to store result data in the dataMap`
+      });
       return;
     }
+  }
+
+  if (task.isFailed()) {
+    res.status(404).send({
+      message: `Failed to process a task with id: ${taskId}, perhaps there is a problem with input texts.`
+    });
+    return;
   }
 
   const curScraper = task.scraper;
@@ -161,7 +174,7 @@ app.delete("/tasks/:id", (req, res) => {
   const taskId = req.params.id;
   logger.info(`DELETE /tasks/${taskId}`);
   if (!taskMap.has(taskId)) {
-    res.status(404).send("Not Found");
+    res.status(404).send({ message: "Not Found" });
     return;
   }
 
@@ -169,14 +182,16 @@ app.delete("/tasks/:id", (req, res) => {
   if (dataMap.has(taskId)) {
     dataMap.delete(taskId);
   }
-  res.status(204).send(`Task with id: ${taskId}, has been removed safely.`);
+  res
+    .status(204)
+    .send({ message: `Task with id: ${taskId}, has been removed safely.` });
 });
 
 app.get("/results/:id", (req, res) => {
   const dataId = req.params.id;
   logger.info(`GET /tasks/${dataId}`);
   if (!dataMap.has(dataId)) {
-    res.status(404).send("Not Found");
+    res.status(404).send({ message: "Not Found" });
     return;
   }
   const data = dataMap.get(dataId);
@@ -187,5 +202,37 @@ app.get("/results/:id", (req, res) => {
 
 app.get("/live", (req, res) => {
   logger.info(`GET /live`);
-  res.status(200).end("system running...");
+  res.status(200).send({ message: "system running..." });
+});
+
+app.get("/cache/status", (req, res) => {
+  logger.info(`GET /cache/status`);
+  const taksEntries = taskMap.entries();
+  const taskList = new Array(taksEntries.length);
+  let index = 0;
+  for (const taskTuple of taksEntries) {
+    const taskId = taskTuple[0];
+    const { created, expires, complete } = taskTuple[1];
+
+    const cr = new Date(created);
+    const ex = new Date(expires);
+
+    taskList[index++] = {
+      created: cr.toLocaleDateString() + " " + cr.toLocaleTimeString(),
+      expires: ex.toLocaleDateString() + " " + ex.toLocaleTimeString(),
+      complete
+    };
+  }
+
+  const dataEntries = dataMap.entries();
+  const dataList = new Array(dataEntries.length);
+  index = 0;
+  for (const dataTuple of dataEntries) {
+    dataList[index++] = dataTuple[0];
+  }
+
+  res.status(200).send({
+    taskList,
+    dataList
+  });
 });
