@@ -10,7 +10,7 @@ module.exports = {
         NODE_ENV: "development",
         PORT: 3000,
         APP_NAME: "twitter-scaper",
-        CLEAR_CACHE_INTERVAL: 60 * 1000,
+        CLEAR_CACHE_INTERVAL: 30 * 60 * 1000,
         DATA_EXPIRATION_TIME_OFFSET: 30 * 1000
       },
       env_production: {
